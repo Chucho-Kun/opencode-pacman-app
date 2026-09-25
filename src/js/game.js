@@ -40,7 +40,7 @@ function createGame() {
       x: g.x,
       y: g.y,
       dir: 'up',
-      speed: GHOST_SPEED,
+      speed: g.kind === 'hunter' ? PACMAN_SPEED : GHOST_SPEED,
       kind: g.kind,
     } ) ),
   };
@@ -113,6 +113,8 @@ function movePacman( game ) {
 function decideGhost( game, g ) {
   const grid = game.grid;
   const p = game.pacman;
+  const W = grid[ 0 ].length;
+  const H = grid.length;
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
@@ -136,6 +138,60 @@ function decideGhost( game, g ) {
       }
     }
     g.dir = best;
+  } else if ( g.kind === 'ambusher' ) {
+    const dPac = DIRS[ p.dir ] || { x: 0, y: 0 };
+    let tx = Math.round( p.x ) + dPac.x * 4;
+    let ty = Math.round( p.y ) + dPac.y * 4;
+    tx = Math.max( 0, Math.min( W - 1, tx ) );
+    ty = Math.max( 0, Math.min( H - 1, ty ) );
+    if ( grid[ ty ][ tx ] === 1 ) {
+      let bestDist2 = Infinity;
+      let bestX = tx;
+      let bestY = ty;
+      for ( let y = 0; y < H; y++ ) {
+        for ( let x = 0; x < W; x++ ) {
+          if ( grid[ y ][ x ] === 1 ) continue;
+          const dist = Math.abs( x - tx ) + Math.abs( y - ty );
+          if ( dist < bestDist2 ) {
+            bestDist2 = dist;
+            bestX = x;
+            bestY = y;
+          }
+        }
+      }
+      tx = bestX;
+      ty = bestY;
+    }
+    let best = choices[ 0 ];
+    let bestDist = Infinity;
+    for ( const dir of choices ) {
+      const d = DIRS[ dir ];
+      const nx = g.x + d.x;
+      const ny = g.y + d.y;
+      const dist = Math.abs( nx - tx ) + Math.abs( ny - ty );
+      if ( dist < bestDist ) {
+        bestDist = dist;
+        best = dir;
+      }
+    }
+    g.dir = best;
+  } else if ( g.kind === 'patrol' ) {
+    const straight = g.dir;
+    const back = OPPOSITE[ g.dir ];
+    let right;
+    let left;
+    if ( g.dir === 'up' ) { right = 'right'; left = 'left'; }
+    else if ( g.dir === 'down' ) { right = 'left'; left = 'right'; }
+    else if ( g.dir === 'left' ) { right = 'up'; left = 'down'; }
+    else if ( g.dir === 'right' ) { right = 'down'; left = 'up'; }
+    else { right = back; left = back; }
+    const order = [ straight, right, left, back ];
+    for ( const dir of order ) {
+      if ( canMove( grid, g.x, g.y, dir, 'ghost' ) ) {
+        g.dir = dir;
+        return;
+      }
+    }
   } else {
     g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
   }
